@@ -8,6 +8,7 @@ on:
       - 'terraform/**'
     branches:
       - main
+      workflow_dispatch: 
 
 jobs:
   terraform:
