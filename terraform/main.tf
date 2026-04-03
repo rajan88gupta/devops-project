@@ -2,6 +2,8 @@
 # Security Group
 resource "aws_security_group" "app_sg" {
   name = "app-sg"
+ description = "Managed by Terraform"
+  vpc_id      = "vpc-0d4c5a302ae74257b"  # <-- your VPC ID
 
   ingress {
     from_port   = 5000
