@@ -4,6 +4,7 @@ resource "aws_instance" "server" {
     instance_type = "t2.micro"
     subnet_id = var.sn
     security_groups = [var.sg]
+    key_name = "devops-key"   # 👈 IMPORTANT (same name as AWS key)
 
       user_data = <<-EOT
     #!/bin/bash
