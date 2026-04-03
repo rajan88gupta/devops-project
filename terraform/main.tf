@@ -1,10 +1,38 @@
 
+provider "aws" {
+  region = var.region
+}
+
+# Create a VPC
+resource "aws_vpc" "main" {
+  cidr_block = "10.0.0.0/16"
+  tags = { Name = "main-vpc" }
+}
+
+# Create a Subnet
+resource "aws_subnet" "main" {
+  vpc_id                  = aws_vpc.main.id
+  cidr_block              = "10.0.1.0/24"
+  availability_zone       = "us-east-1a"
+  map_public_ip_on_launch = true
+  tags = { Name = "main-subnet" }
+}
+
 # Security Group
 resource "aws_security_group" "app_sg" {
-  name = "app-sg"
- description = "Managed by Terraform"
-  vpc_id      = "vpc-0d4c5a302ae74257b"  # <-- your VPC ID
+  name        = "app-sg"
+  description = "Allow SSH and App Port"
+  vpc_id      = aws_vpc.main.id
 
+  # SSH access
+  ingress {
+    from_port   = 22
+    to_port     = 22
+    protocol    = "tcp"
+    cidr_blocks = [var.my_ip]
+  }
+
+  # App access (Port 5000)
   ingress {
     from_port   = 5000
     to_port     = 5000
@@ -12,45 +40,39 @@ resource "aws_security_group" "app_sg" {
     cidr_blocks = ["0.0.0.0/0"]
   }
 
-  ingress {
-    from_port   = 22
-    to_port     = 22
-    protocol    = "tcp"
-    cidr_blocks = ["122.63.130.176/32"]
-  }
-
+  # Egress
   egress {
     from_port   = 0
     to_port     = 0
     protocol    = "-1"
     cidr_blocks = ["0.0.0.0/0"]
   }
+
+  tags = { Name = "DevOps-App-SG" }
 }
 
-# EC2 Instance
+# EC2 instance
 resource "aws_instance" "app_server" {
-  ami           = "ami-01b14b7ad41e17ba4" # Amazon Linux 2 (update if needed)
-  instance_type = "t2.micro"
+  ami                    = var.ami_id
+  instance_type          = var.instance_type
+  subnet_id              = aws_subnet.main.id
+  vpc_security_group_ids = [aws_security_group.app_sg.id]
+ 
 
-  security_groups = [aws_security_group.app_sg.name]
+  user_data = <<-EOT
+    #!/bin/bash
+    yum update -y
+    yum install docker -y
+    service docker start
+    usermod -a -G docker ec2-user
 
-  user_data = <<-EOF
-              #!/bin/bash
-              yum update -y
-              yum install docker -y
-              service docker start
-              usermod -a -G docker ec2-user
+    # Login to ECR
+    aws ecr get-login-password --region ${var.region} | docker login --username AWS --password-stdin ${var.ecr_repo}
+    
+    # Pull and run container
+    docker pull ${var.ecr_repo}:latest
+    docker run -d -p 5000:5000 ${var.ecr_repo}:latest
+  EOT
 
-              # Login to ECR
-              aws ecr get-login-password --region us-east-1 | docker login --username AWS --password-stdin 882127294927.dkr.ecr.us-east-		1.amazonaws.com/advanced-devops-app
-              # Pull image
-              docker pull 882127294927.dkr.ecr.us-east-1.amazonaws.com/advanced-devops-app:latest
-
-              # Run container
-              docker run -d -p 5000:5000 882127294927.dkr.ecr.us-east-1.amazonaws.com/advanced-devops-app:latest
-              EOF
-
-  tags = {
-    Name = "DevOps-App-Server"
-  }
+  tags = { Name = "DevOps-App-Server" }
 }
