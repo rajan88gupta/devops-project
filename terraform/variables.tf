@@ -13,7 +13,7 @@ variable "ami_id" {
 
 variable "my_ip" {
   # Your current IP for SSH access
-  default = "122.63.130.176/32"
+  default = "0.0.0.0/0"
 }
 
 variable "ecr_repo" {
